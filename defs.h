@@ -25,6 +25,8 @@ void            panic(char*) __attribute__((noreturn));
 // exec.c
 int             exec(char*, char**);
 
+int             forknexec(char*, char**);
+
 // file.c
 struct file*    filealloc(void);
 void            fileclose(struct file*);
@@ -120,6 +122,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);
