@@ -3,7 +3,7 @@
 
 int main(int argc, char *argv[])
 {
-    char *args[] = {"asdfasdfa", "NEWPROC_CALL", 0};
+    char *args[] = {"echo", "NEWPROC_CALL", 0};
     int ret;
     printf(1, "Test forknexec syscall\n");
     ret = forknexec(args[0], args);

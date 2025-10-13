@@ -231,7 +231,7 @@ forknexec(char *path, char **argv)
 
   // Allocate process.
   if((np = allocproc()) == 0){
-    return -1;
+    return -2;
   }
 
   np->parent = curproc;
@@ -259,7 +259,7 @@ forknexec(char *path, char **argv)
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
-    return -1;
+    return -2;
   }
   ilock(ip);
   pgdir = 0;
@@ -347,7 +347,7 @@ forknexec(char *path, char **argv)
     iunlockput(ip);
     end_op();
   }
-  return -1;
+  return -2;
 }
 
 // Exit the current process.  Does not return.
