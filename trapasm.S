@@ -4,6 +4,7 @@
 .globl alltraps
 alltraps:
   # Build trap frame.
+  # 각 레지스터의 데이터를 스택 메모리에 할당
   pushl %ds
   pushl %es
   pushl %fs

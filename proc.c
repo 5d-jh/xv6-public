@@ -111,6 +111,7 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  p->priority = 5;
 
   return p;
 }
@@ -138,6 +139,7 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->priority = 5;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -323,6 +325,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *chosen_proc = 0;
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -332,26 +335,41 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    chosen_proc = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
+      if (chosen_proc == 0 || p-> priority < chosen_proc->priority)
+        chosen_proc = p;
+      else if (p->priority > 1)
+        p->priority--;
+    }
+
+    if (chosen_proc != 0)
+    {
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      c->proc = chosen_proc;
+      switchuvm(chosen_proc);
+      chosen_proc->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
+      swtch(&(c->scheduler), chosen_proc->context);
       switchkvm();
+
+      if (chosen_proc->priority < 10)
+      {
+        chosen_proc->priority  = 10;
+      }
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
-    release(&ptable.lock);
 
+
+    release(&ptable.lock);
   }
 }
 
@@ -531,4 +549,27 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+get_proc_priority()
+{
+  return myproc()->priority;
+}
+
+int
+set_proc_priority(int pid, int priority)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid) {
+      p->priority = priority;
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
 }

@@ -33,6 +33,7 @@ idtinit(void)
 }
 
 //PAGEBREAK: 41
+// called by alltraps in trapasm.S
 void
 trap(struct trapframe *tf)
 {
