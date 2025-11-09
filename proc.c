@@ -325,9 +325,12 @@ void
 scheduler(void)
 {
   struct proc *p;
-  struct proc *chosen_proc = 0;
+  struct proc *lastrun;
   struct cpu *c = mycpu();
   c->proc = 0;
+
+  int level = 1;
+  int slot;
   
   for(;;){
     // Enable interrupts on this processor.
@@ -335,39 +338,51 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    chosen_proc = 0;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      if (chosen_proc == 0 || p-> priority < chosen_proc->priority)
-        chosen_proc = p;
-      else if (p->priority > 1)
-        p->priority--;
-    }
+    level = level % NPROPRITY + 1;
+    slot = NPROPRITY - level + 1;
 
-    if (chosen_proc != 0)
+    while (slot > 0)
     {
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = chosen_proc;
-      switchuvm(chosen_proc);
-      chosen_proc->state = RUNNING;
+      int run = 0;
 
-      swtch(&(c->scheduler), chosen_proc->context);
-      switchkvm();
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if(p->state != RUNNABLE)
+          continue;
 
-      if (chosen_proc->priority < 10)
-      {
-        chosen_proc->priority  = 10;
+        if (level != p->priority)
+        {
+          if (level < p->priority && p->priority > 0)
+            p->priority--;
+          continue;
+        }
+
+        if (slot-- <= 0)
+          break;
+
+        run = 1;
+
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+
+
+        if (p->priority < 10)
+          p->priority++;
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
       }
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+      if (!run)
+        break;
     }
-
 
     release(&ptable.lock);
   }

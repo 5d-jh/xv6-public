@@ -5,8 +5,10 @@
 
 int main(int argc, char *argv[])
 {
+    // set_proc_priority(getpid(), );
+    printf(1, "%d, priority: %d, cnt: %d\n", getpid(), get_proc_priority(), 0);
     printf(1, "created process %d\n", getpid());
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 9; i++)
     {
         int pid = fork();
 
@@ -22,8 +24,10 @@ int main(int argc, char *argv[])
     int cnt = 0;
     while (1)
     {
+
+        // set_proc_priority(3, 1);
         printf(1, "%d, priority: %d, cnt: %d\n", mypid, get_proc_priority(), cnt++);
-        while (j++ < INT_MAX) {}
+        while (j++ < INT_MAX/3) {}
         j = 0;
     }
 }
