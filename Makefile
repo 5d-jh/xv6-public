@@ -29,7 +29,7 @@ OBJS = \
 	vm.o\
 
 # Cross-compiling (e.g., on Mac OS X)
-# TOOLPREFIX = i386-jos-elf
+ TOOLPREFIX = qemu-system-i386
 
 # Using native tools (e.g., on X86 Linux)
 #TOOLPREFIX = 
@@ -181,6 +181,7 @@ UPROGS=\
 	_usertests\
 	_wc\
 	_zombie\
+	_hw4
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

@@ -318,25 +318,26 @@ copyuvm(pde_t *pgdir, uint sz)
   pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
-  char *mem;
 
-  if((d = setupkvm()) == 0)
+  if((d = setupkvm()) == 0) // setup page directory entry
     return 0;
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
+
+    *pte &= ~PTE_W;
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
+
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
       goto bad;
-    memmove(mem, (char*)P2V(pa), PGSIZE);
-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
-      kfree(mem);
-      goto bad;
-    }
+
+    inc_refcount(pa);
   }
+
+  lcr3(V2P(pgdir));
   return d;
 
 bad:
@@ -385,10 +386,42 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
-//PAGEBREAK!
-// Blank page.
+void pagefault()
+{
+  void *fault_va = (void *)rcr2();
+  pde_t *pgdir = myproc()->pgdir;
+  pte_t *pte;
+  uint pa;
+  uint refcnt;
 
+  if ((pte = walkpgdir(pgdir, fault_va, 1)) == 0)
+    panic("pagefault: pte should exist");
+
+  pa = PTE_ADDR(*pte);
+  refcnt = get_refcount(pa);
+
+  if (refcnt == 1)
+    *pte |= PTE_W;
+
+  if (refcnt > 1)
+  {
+    char* new_pa;
+
+    if ((new_pa = kalloc()) == 0)
+      panic("pagefault: new allocation failed");
+
+    char *src = P2V(pa);
+    memmove(new_pa, src, PGSIZE);
+    *pte = V2P(new_pa) | PTE_FLAGS(*pte) | PTE_W;
+    dec_refcount(pa);
+  }
+
+  lcr3(V2P(pgdir));
+}
+
+//PAGEBREAK!
+// Blank page.
+//PAGEBREAK!
+// Blank page.
+//PAGEBREAK!
+// Blank page.

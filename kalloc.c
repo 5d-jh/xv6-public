@@ -9,6 +9,9 @@
 #include "mmu.h"
 #include "spinlock.h"
 
+uint pgrefcount[PHYSTOP >> PTXSHIFT];
+uint numFreePages = PHYSTOP >> PTXSHIFT;
+
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
                    // defined by the kernel linker script in kernel.ld
@@ -49,7 +52,10 @@ freerange(void *vstart, void *vend)
   char *p;
   p = (char*)PGROUNDUP((uint)vstart);
   for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
+  {
     kfree(p);
+    pgrefcount[V2P(p) >> PTXSHIFT] = 0;
+  }
 }
 //PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
@@ -64,14 +70,29 @@ kfree(char *v)
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
 
+  if(kmem.use_lock)
+    acquire(&kmem.lock);
+
+  // 프로세스간 페이지를 공유할 시 refcount만 내리기
+  if (get_refcount(V2P(v)) > 1)
+  {
+    dec_refcount(V2P(v));
+    if(kmem.use_lock)
+      release(&kmem.lock);
+    return;
+  }
+
+  numFreePages++;
+
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
 
-  if(kmem.use_lock)
-    acquire(&kmem.lock);
   r = (struct run*)v;
+
   r->next = kmem.freelist;
   kmem.freelist = r;
+  dec_refcount(V2P(v));
+
   if(kmem.use_lock)
     release(&kmem.lock);
 }
@@ -86,11 +107,39 @@ kalloc(void)
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
+
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  numFreePages--;
+
+  pgrefcount[V2P(r) >> PTXSHIFT] = 1;
+
   if(kmem.use_lock)
     release(&kmem.lock);
+
   return (char*)r;
 }
 
+uint
+get_refcount(uint pa)
+{
+  return pgrefcount[pa >> PTXSHIFT];
+}
+
+void
+inc_refcount(uint pa)
+{
+  pgrefcount[pa >> PTXSHIFT]++;
+}
+
+void
+dec_refcount(uint pa)
+{
+  pgrefcount[pa >> PTXSHIFT]--;
+}
+
+uint getNumFreePages()
+{
+  return numFreePages;
+}
