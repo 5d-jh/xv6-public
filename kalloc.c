@@ -10,7 +10,7 @@
 #include "spinlock.h"
 
 uint pgrefcount[PHYSTOP >> PTXSHIFT];
-uint numFreePages = PHYSTOP >> PTXSHIFT;
+uint num_free_pages = 0;
 
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
@@ -82,7 +82,8 @@ kfree(char *v)
     return;
   }
 
-  numFreePages++;
+  num_free_pages++;
+  dec_refcount(V2P(v));
 
   // Fill with junk to catch dangling refs.
   memset(v, 1, PGSIZE);
@@ -91,7 +92,6 @@ kfree(char *v)
 
   r->next = kmem.freelist;
   kmem.freelist = r;
-  dec_refcount(V2P(v));
 
   if(kmem.use_lock)
     release(&kmem.lock);
@@ -111,8 +111,8 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
-  numFreePages--;
 
+  num_free_pages--;
   pgrefcount[V2P(r) >> PTXSHIFT] = 1;
 
   if(kmem.use_lock)
@@ -141,5 +141,5 @@ dec_refcount(uint pa)
 
 uint getNumFreePages()
 {
-  return numFreePages;
+  return num_free_pages;
 }
